@@ -32,6 +32,7 @@ class NotionClient(object):
         cache_key = cache_key or hashlib.sha256(token_v2.encode()).hexdigest()
         self._store = RecordStore(self, cache_key=cache_key)
         self._monitor = Monitor(self)
+        self.view_id = ""
         if start_monitoring:
             self.start_monitoring()
         self._update_user_info()
@@ -95,6 +96,7 @@ class NotionClient(object):
             if not match:
                 raise Exception("Invalid collection view URL")
             block_id, view_id = match.groups()
+            self.view_id = extract_id(view_id)
             collection = self.get_block(block_id, force_refresh=force_refresh).collection
         else:
             view_id = url_or_id
@@ -167,13 +169,15 @@ class NotionClient(object):
 
     def search_pages_with_parent(self, parent_id, search=""):
 
-        data = {"query": search, "parentId": parent_id, "limit": 10000}
+        data = {"collectionId": parent_id, "collectionViewId": self.view_id, "loader":{"type":"table","limit":1000,"userTimeZone":"America/New_York","userLocale":"en","loadContentCover":True}}
 
-        response = self.post("searchPagesWithParent", data).json()
+        # data = {"query": search, "parentId": parent_id, "limit": 10000}
+
+        response = self.post("queryCollection", data).json()
 
         self._store.store_recordmap(response["recordMap"])
 
-        return response["results"]
+        return response["result"]['blockIds']
 
     def create_record(self, table, parent, **kwargs):
 
